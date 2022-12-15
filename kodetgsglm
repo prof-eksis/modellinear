@@ -1,0 +1,89 @@
+---
+title: "Paper Kelompok 4"
+output: html_document
+date: "2022-12-11"
+---
+
+## DATA
+```{r}
+data<-read.csv("https://raw.githubusercontent.com/prof-eksis/modellinear/main/paper-glm.csv", sep=';')
+head(data)
+str(data)
+```
+
+## Standarisasi data
+```{r}
+library(scales)
+
+data1 <- data %>% dplyr::select(Jumlah.Penduduk, Jumlah.Kasus, Kepadatan.Penduduk, Jumlah.Banjir, Rasio.GINI, Jumlah.Faskes.Pertama, Jumlah.Faskes.Lanjutan, Total.Faskes, Jumlah.Tenaga.Medis.Faskes, Persentase.RT.Akses.Sanitasi.Layak)
+
+# standarisasi dengan skala 0 hingga 1 untuk variabel prediktor jumlah penduduk, rasio gini, dan sanitasi
+data.scale <- data1 %>% mutate_at(c('Jumlah.Penduduk', 'Rasio.GINI','Persentase.RT.Akses.Sanitasi.Layak'), ~(rescale(.,to=c(0,1)) %>% as.vector))
+head(data.scale)
+```
+
+## POISSON
+```{r}
+mod1<-glm(Jumlah.Kasus~Kepadatan.Penduduk+Jumlah.Banjir+Rasio.GINI+Total.Faskes+Persentase.RT.Akses.Sanitasi.Layak, family = poisson(link=log),  offset = Jumlah.Penduduk, data=data.scale)
+summary(mod1)
+```
+
+### Interpretasi Beta 1 (Kepadatan Penduduk)
+```{r}
+exp(-5.483e-06)
+```
+
+### Selang Kepercayaan (CI) Poisson Kepadatan Penduduk
+```{r}
+exp_Poiss<-exp(c((-5.483e-06-1.96*1.294e-06),((-5.483e-06+1.96*1.294e-06))))
+exp_Poiss
+```
+
+### Dugaan & Sisaan
+```{r}
+(y_duga_mod1<-fitted(mod1))
+(sisaan_mod1<-resid(mod1))
+```
+
+### Rata-Rata dan Ragam
+```{r}
+mean(data$Jumlah.Kasus)
+var(data$Jumlah.Kasus)
+```
+
+## OVERDISPERSION (Uji Deviance & Chi-Square)
+```{r}
+sum(resid(mod1,type="pearson")^2)
+(Deviance=18455/(34-6-1))     
+(ChiSquare=18613.06/(34-6-1))  # Karena Deviance dan Chi-Square > 1 maka dapat disimpulkan terjadi overdispersi
+```
+
+## NEGATIVE BINOMIAL
+```{r}
+library(MASS)
+mod2<- glm.nb(Jumlah.Kasus~Kepadatan.Penduduk+Jumlah.Banjir+Rasio.GINI+Total.Faskes+Persentase.RT.Akses.Sanitasi.Layak, offset(Jumlah.Penduduk), data=data.scale)
+summary(mod2)
+```
+
+### Interpretasi Beta 2 (Jumlah Banjir)
+```{r}
+exp(-5.093e-06)
+```
+
+### Selang Kepercayaan (CI) Negative Binomial Jumlah Banjir
+```{r}
+exp_nb<-exp(c((-5.093e-06-1.96*9.017e-05),((-5.093e-06+1.96*9.017e-05))))
+exp_nb
+```
+
+### Dugaan & Sisaan
+```{r}
+(y_duga_mod2<-fitted(mod2))
+(sisaan_mod2<-resid(mod2))
+```
+
+## UJI MULTIKOLINEARITAS
+```{r}
+car::vif(mod1)
+car::vif(mod2)
+```
